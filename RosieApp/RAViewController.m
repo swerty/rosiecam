@@ -65,6 +65,15 @@ typedef enum {
     //add output
     [self.captureSession addOutput:videoDataOutput];
     
+    //set the orientation of the video into the videoDataOutput connection
+    for( AVCaptureConnection *connection in videoDataOutput.connections){
+        for(AVCaptureInputPort *port in [connection inputPorts]){
+            if([[port mediaType] isEqual:AVMediaTypeVideo]){
+                connection.videoOrientation = AVCaptureVideoOrientationPortrait;
+            }
+        }
+    }
+    
     //assemble the file url
     NSString *fileName = @"temp.mp4";
     NSError *error = nil;
@@ -93,6 +102,10 @@ typedef enum {
                                        
 - (void) captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection{
         NSLog(@"got sample buffer");
+    
+    //Synchonously process the pixel buffer to de-greenify it
+    CVImageBufferRef pixelBuffer  = CMSampleBufferGetImageBuffer(sampleBuffer);
+    [self processPixelBuffer:pixelBuffer];
     
     if(!self.videoInputReady){
         self.videoInputReady = [self setUpVideoInput:CMSampleBufferGetFormatDescription(sampleBuffer)];
@@ -130,7 +143,26 @@ typedef enum {
         
         });
     }
-                       
+    
+}
+
+
+- (void)processPixelBuffer:(CVImageBufferRef) pixelBuffer{
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    
+    int bufferWidth = (int) CVPixelBufferGetWidth(pixelBuffer);
+    int bufferHeight = (int) CVPixelBufferGetHeight(pixelBuffer);
+    unsigned char *pixel = (unsigned char*) CVPixelBufferGetBaseAddress(pixelBuffer);
+    
+    int bytesPerPixel = 4;
+    for (int row = 0; row < bufferWidth; row++) {
+        for (int column = 0; column <bufferHeight; column++) {
+            pixel[1] = 0;
+            pixel = pixel + bytesPerPixel;
+        }
+    }
+    
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
 - (BOOL) setUpVideoInput:(CMFormatDescriptionRef)formatDescription{
