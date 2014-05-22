@@ -26,6 +26,7 @@ typedef enum {
 @property (nonatomic) dispatch_queue_t assetWritingQueue;
 @property (nonatomic, assign) BOOL videoInputReady;
 @property (nonatomic, strong) AVAssetWriterInput *assetWriterVideoInput;
+@property (nonatomic, assign) int lastValue;
 
 @end
 
@@ -97,6 +98,8 @@ typedef enum {
     //instantiate a queue for asset writing so we have access to it later in sample buffer method
     self.assetWritingQueue = dispatch_queue_create("edu.cornell.myUniqueQueueName", DISPATCH_QUEUE_SERIAL);
     
+    self.lastValue = 123;
+    
     [self.captureSession startRunning];
 }
                                        
@@ -154,10 +157,14 @@ typedef enum {
     int bufferHeight = (int) CVPixelBufferGetHeight(pixelBuffer);
     unsigned char *pixel = (unsigned char*) CVPixelBufferGetBaseAddress(pixelBuffer);
     
+    int greenValue = (self.lastValue + ((rand()%16) - 8)) % 256;
+    self.lastValue = greenValue;
+    
     int bytesPerPixel = 4;
+    
     for (int row = 0; row < bufferWidth; row++) {
         for (int column = 0; column <bufferHeight; column++) {
-            pixel[1] = 0;
+            pixel[1] = greenValue;
             pixel = pixel + bytesPerPixel;
         }
     }
@@ -231,6 +238,16 @@ typedef enum {
     [self.assetWriterVideoInput markAsFinished];
     
     self.recordingState = RARecordingStateFinishedRecording;
+    
+    NSString *filePath = [self.fileURL path];
+    
+    UISaveVideoAtPathToSavedPhotosAlbum(filePath, self, @selector(video:didFinishSavingWithError:contextInfo:), nil);
+}
+
+- (void)               video: (NSString *) videoPath
+    didFinishSavingWithError: (NSError *) error
+                 contextInfo: (void *) contextInfo{
+    NSLog(@"the video was saved");
 }
 
 - (IBAction)playButtonPressed:(id)sender {
